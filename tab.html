@@ -35,7 +35,7 @@
     VSS.register("registerRelease", {
       updateContext: noop,
       isInvisible: function (state) {
-        let protractorTaskId = "83c082c0-5032-11ea-8fab-bbe0f0fcf287"
+        let cucumberTaskId = "42cfa816-d709-4086-9568-7287ea18beb1"
         let resultArray = []
         state.releaseEnvironment.deployPhasesSnapshot.forEach(phase => {
           phase.workflowTasks.forEach(task => {
@@ -43,7 +43,7 @@
           })
         })
 
-        return !resultArray.includes(protractorTaskId)
+        return !resultArray.includes(cucumberTaskId)
       }
     });
   </script>

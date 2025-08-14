@@ -8,9 +8,9 @@ import TFS_Release_Contracts = require("ReleaseManagement/Core/Contracts");
 
 abstract class BaseReportTab extends Controls.BaseControl {
   protected readonly ATTACHMENT_TYPE: string = "cucumber.report";
-  protected readonly ATTACHMENT_NAME: string = "cucumber_report.html"
+  protected readonly ATTACHMENT_NAME: string = "*.html"
   protected readonly SCREENSHOT_TYPE: string = "cucumber.screenshot"
-  protected readonly TASK_ID: string = '83c082c0-5032-11ea-8fab-bbe0f0fcf287'
+  protected readonly TASK_ID: string = '42cfa816-d709-4086-9568-7287ea18beb1'
 
   private isFirstReport;
 
@@ -119,6 +119,8 @@ class BuildReportTab extends BaseReportTab {
       const projectId = vsoContext.project.id;
       const planId = build.orchestrationPlan.planId;
 
+      console.log(`Searching for attachments in project: ${projectId}, plan: ${planId}`)
+
       const cucumberReports = (await taskClient.getPlanAttachments(
         projectId,
         this.hubName,
@@ -126,20 +128,41 @@ class BuildReportTab extends BaseReportTab {
         this.ATTACHMENT_TYPE
         ))
 
-        cucumberReports.forEach(async (cucumberReport, index) => {
+      console.log(`Found ${cucumberReports.length} cucumber reports`)
+      
+      if (cucumberReports.length === 0) {
+        this.setTabText('No Cucumber reports found. Make sure the Publish Cucumber Report task ran successfully.')
+        console.log('No cucumber.report attachments found')
+        return
+      }
+
+      for (const cucumberReport of cucumberReports) {
+        try {
           this.setTabText('Processing Report File')
-          console.log(cucumberReport)
+          console.log('Processing report:', cucumberReport.name)
 
           const attachmentContent = await taskClient.getAttachmentContent(projectId, this.hubName, planId, cucumberReport.timelineId, cucumberReport.recordId, this.ATTACHMENT_TYPE, cucumberReport.name)
           let htmlContent = this.convertBufferToString(attachmentContent)
+          
+          if (!htmlContent || htmlContent.length === 0) {
+            console.log('Empty HTML content received')
+            continue
+          }
+
           this.setTabText('Looking for screenshots')
           let screenshots = await taskClient.getPlanAttachments(projectId, this.hubName, planId, this.SCREENSHOT_TYPE)
 
           let finalReport = this.sanitizeImageLinks(htmlContent, screenshots)
           this.setTabText('Publishing Report')
           this.setFrameHtmlContent(finalReport, cucumberReport.name)
-        })
+          break // Show first report found
+        } catch (reportError) {
+          console.error('Error processing report:', reportError)
+          continue
+        }
+      }
     } catch (error) {
+      console.error('Error in findAttachment:', error)
       this.setErrorText(error, 'Unable to load Cucumber Report')
     }
   }
@@ -188,7 +211,7 @@ class ReleaseReportTab extends BaseReportTab {
                 // TODO: Check if works on all browsers
                 console.log("task")
                 console.log(task.task)
-                if (task.task?.id === '83c082c0-5032-11ea-8fab-bbe0f0fcf287'){
+                if (task.task?.id === '42cfa816-d709-4086-9568-7287ea18beb1'){
                   
                   const attachments = await rmClient.getTaskAttachments(
                     vsoContext.project.id,
