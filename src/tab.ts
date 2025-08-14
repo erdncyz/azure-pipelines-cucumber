@@ -108,6 +108,15 @@ class BuildReportTab extends BaseReportTab {
     this.config.onBuildChanged((build: TFS_Build_Contracts.Build) => {
       this.findAttachment(build)
     })
+
+    // Add timeout to prevent infinite loading
+    setTimeout(() => {
+      const waitingElement = this.getElement().find("#waiting p");
+      if (waitingElement.length > 0 && waitingElement.text().includes('Looking for Report File')) {
+        this.setTabText('Timeout: No reports found. Check if Publish Cucumber Report task ran successfully.')
+        console.log('Timeout reached - no reports found')
+      }
+    }, 30000) // 30 seconds timeout
   }
 
   private async findAttachment(build: TFS_Build_Contracts.Build)  {
@@ -120,6 +129,14 @@ class BuildReportTab extends BaseReportTab {
       const planId = build.orchestrationPlan.planId;
 
       console.log(`Searching for attachments in project: ${projectId}, plan: ${planId}`)
+      console.log(`Attachment type: ${this.ATTACHMENT_TYPE}`)
+
+      // First try to get all attachments to see what's available
+      const allAttachments = await taskClient.getPlanAttachments(projectId, this.hubName, planId, "*")
+      console.log(`Found ${allAttachments.length} total attachments`)
+      allAttachments.forEach((attachment, index) => {
+        console.log(`Attachment ${index + 1}: ${attachment.name} (${attachment.type})`)
+      })
 
       const cucumberReports = (await taskClient.getPlanAttachments(
         projectId,
@@ -129,6 +146,25 @@ class BuildReportTab extends BaseReportTab {
         ))
 
       console.log(`Found ${cucumberReports.length} cucumber reports`)
+      cucumberReports.forEach((report, index) => {
+        console.log(`Report ${index + 1}: ${report.name} (${report.type})`)
+      })
+      
+      if (cucumberReports.length === 0) {
+        // Try alternative attachment types
+        const alternativeTypes = ['cucumber.report', 'cucumber_report', 'cucumber-report', 'html.report']
+        for (const altType of alternativeTypes) {
+          if (altType === this.ATTACHMENT_TYPE) continue
+          
+          console.log(`Trying alternative attachment type: ${altType}`)
+          const altReports = await taskClient.getPlanAttachments(projectId, this.hubName, planId, altType)
+          if (altReports.length > 0) {
+            console.log(`Found ${altReports.length} reports with type ${altType}`)
+            cucumberReports.push(...altReports)
+            break
+          }
+        }
+      }
       
       if (cucumberReports.length === 0) {
         this.setTabText('No Cucumber reports found. Make sure the Publish Cucumber Report task ran successfully.')
@@ -141,7 +177,7 @@ class BuildReportTab extends BaseReportTab {
           this.setTabText('Processing Report File')
           console.log('Processing report:', cucumberReport.name)
 
-          const attachmentContent = await taskClient.getAttachmentContent(projectId, this.hubName, planId, cucumberReport.timelineId, cucumberReport.recordId, this.ATTACHMENT_TYPE, cucumberReport.name)
+          const attachmentContent = await taskClient.getAttachmentContent(projectId, this.hubName, planId, cucumberReport.timelineId, cucumberReport.recordId, cucumberReport.type, cucumberReport.name)
           let htmlContent = this.convertBufferToString(attachmentContent)
           
           if (!htmlContent || htmlContent.length === 0) {
