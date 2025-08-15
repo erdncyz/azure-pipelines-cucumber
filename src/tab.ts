@@ -131,19 +131,38 @@ class BuildReportTab extends BaseReportTab {
       console.log(`Searching for attachments in project: ${projectId}, plan: ${planId}`)
       console.log(`Attachment type: ${this.ATTACHMENT_TYPE}`)
 
-      // First try to get all attachments to see what's available
-      const allAttachments = await taskClient.getPlanAttachments(projectId, this.hubName, planId, "*")
+      // Try to get attachments with different types to see what's available
+      const attachmentTypes = ['cucumber.report', 'cucumber_report', 'cucumber-report', 'html.report', 'test.report']
+      let allAttachments = []
+      
+      for (const type of attachmentTypes) {
+        try {
+          const attachments = await taskClient.getPlanAttachments(projectId, this.hubName, planId, type)
+          if (attachments.length > 0) {
+            console.log(`Found ${attachments.length} attachments with type: ${type}`)
+            allAttachments.push(...attachments)
+          }
+        } catch (error) {
+          console.log(`No attachments found for type: ${type}`)
+        }
+      }
+      
       console.log(`Found ${allAttachments.length} total attachments`)
       allAttachments.forEach((attachment, index) => {
         console.log(`Attachment ${index + 1}: ${attachment.name} (${attachment.type})`)
       })
 
-      const cucumberReports = (await taskClient.getPlanAttachments(
-        projectId,
-        this.hubName,
-        planId,
-        this.ATTACHMENT_TYPE
-        ))
+      let cucumberReports = []
+      try {
+        cucumberReports = await taskClient.getPlanAttachments(
+          projectId,
+          this.hubName,
+          planId,
+          this.ATTACHMENT_TYPE
+        )
+      } catch (error) {
+        console.log(`Error getting attachments for type ${this.ATTACHMENT_TYPE}:`, error)
+      }
 
       console.log(`Found ${cucumberReports.length} cucumber reports`)
       cucumberReports.forEach((report, index) => {
