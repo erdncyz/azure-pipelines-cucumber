@@ -73,8 +73,32 @@ async function main() {
     const inputPath = tl.getPathInput('jsonDir', true, false)
     const normalizedInputPath = inputPath.replace(/\\/g, '/')
     const pathHasMagic = hasMagic(normalizedInputPath)
+    
+    console.log(`Input path: ${inputPath}`)
+    console.log(`Normalized path: ${normalizedInputPath}`)
+    console.log(`Path has magic: ${pathHasMagic}`)
+    
+    // Debug: List directory contents
+    try {
+      const fs = require('fs-extra')
+      if (await fs.pathExists(normalizedInputPath)) {
+        const contents = await fs.readdir(normalizedInputPath)
+        console.log(`Directory contents of ${normalizedInputPath}:`, contents)
+      } else {
+        console.log(`Directory does not exist: ${normalizedInputPath}`)
+      }
+    } catch (err) {
+      console.log(`Error reading directory: ${err.message}`)
+    }
+    
     const files = await globby([`${normalizedInputPath}/*.json`])
     console.log(`Found ${files.length} matching ${inputPath} pattern`)
+    
+    if (files.length === 0) {
+      console.log(`No JSON files found. Searching for any JSON files in subdirectories...`)
+      const allJsonFiles = await globby([`${normalizedInputPath}/**/*.json`])
+      console.log(`Found ${allJsonFiles.length} JSON files in subdirectories:`, allJsonFiles)
+    }
 
     unifyCucumberReport(files, pathHasMagic)
     const outputPath = tl.getPathInput('outputPath', true, true)
